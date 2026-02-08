@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
       - name: sensor-ingestion
-        image: seu-dockerhub/agro-sensor-ingestion:latest
+        image: fabioopedroso/agro-sensor-ingestion:v1
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
