@@ -51,6 +51,16 @@ spec:
             secretKeyRef:
               name: agrosolutions-secrets
               key: jwt-audience
+        - name: RabbitMQ__Username
+          valueFrom:
+            secretKeyRef:
+              name: agrosolutions-secrets
+              key: rabbitmq-user
+        - name: RabbitMQ__Password
+          valueFrom:
+            secretKeyRef:
+              name: agrosolutions-secrets
+              key: rabbitmq-password
         resources:
           requests:
             memory: "128Mi"
