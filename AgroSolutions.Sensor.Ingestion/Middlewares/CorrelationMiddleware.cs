@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace AgroSolutions.Sensor.Ingestion.Middlewares;
 
 public class CorrelationMiddleware
@@ -15,33 +17,70 @@ public class CorrelationMiddleware
     public async Task InvokeAsync(HttpContext context)
     {
         var correlationId = GetOrCreateCorrelationId(context);
-        
-        context.Items[CorrelationIdHeader] = correlationId;
-        context.Response.Headers[CorrelationIdHeader] = correlationId;
+        AddCorrelationIdToResponse(context, correlationId);
 
-        using (_logger.BeginScope(new Dictionary<string, object>
+        using (CreateLogScope(correlationId))
         {
-            [CorrelationIdHeader] = correlationId
-        }))
-        {
-            _logger.LogInformation("Iniciando requisição {Method} {Path}", context.Request.Method, context.Request.Path);
-            
-            await _next(context);
-            
-            _logger.LogInformation("Finalizando requisição {Method} {Path} - Status {StatusCode}", 
-                context.Request.Method, context.Request.Path, context.Response.StatusCode);
+            await LogAndExecuteRequestAsync(context, correlationId);
         }
     }
 
     private string GetOrCreateCorrelationId(HttpContext context)
     {
-        if (context.Request.Headers.TryGetValue(CorrelationIdHeader, out var correlationId) 
-            && !string.IsNullOrWhiteSpace(correlationId))
+        if (!context.Request.Headers.TryGetValue(CorrelationIdHeader, out var correlationId))
         {
-            return correlationId!;
+            correlationId = Guid.NewGuid().ToString();
         }
 
-        return Guid.NewGuid().ToString();
+        return correlationId;
+    }
+
+    private void AddCorrelationIdToResponse(HttpContext context, string correlationId)
+    {
+        context.Response.OnStarting(() =>
+        {
+            if (!context.Response.Headers.ContainsKey(CorrelationIdHeader))
+            {
+                context.Response.Headers.Append(CorrelationIdHeader, correlationId);
+            }
+            return Task.CompletedTask;
+        });
+    }
+
+    private IDisposable CreateLogScope(string correlationId)
+    {
+        return _logger.BeginScope("{CorrelationId}: {CorrelationIdValue}", "CorrelationId", correlationId);
+    }
+
+    private async Task LogAndExecuteRequestAsync(HttpContext context, string correlationId)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            _logger.LogInformation("Request started: {Method} {Path}", context.Request.Method, context.Request.Path);
+
+            await _next(context);
+
+            stopwatch.Stop();
+            _logger.LogInformation(
+                "Request finished: {Method} {Path} responded {StatusCode} in {ElapsedMilliseconds}ms",
+                context.Request.Method,
+                context.Request.Path,
+                context.Response.StatusCode,
+                stopwatch.ElapsedMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(
+                ex,
+                "Request failed: {Method} {Path} after {ElapsedMilliseconds}ms",
+                context.Request.Method,
+                context.Request.Path,
+                stopwatch.ElapsedMilliseconds);
+            throw;
+        }
     }
 }
 
