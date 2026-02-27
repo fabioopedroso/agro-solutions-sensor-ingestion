@@ -1,6 +1,104 @@
-@AgroSolutions.Sensor.Ingestion_HostAddress = http://localhost:5165
+@AgroSolutions.Sensor.Ingestion_HostAddress = https://localhost:7001
+@token = seu_token_jwt_aqui
 
-GET {{AgroSolutions.Sensor.Ingestion_HostAddress}}/weatherforecast/
-Accept: application/json
+### Health Check
+GET {{AgroSolutions.Sensor.Ingestion_HostAddress}}/
+
+###
+
+### Ingest Sensor Data - Success
+POST {{AgroSolutions.Sensor.Ingestion_HostAddress}}/api/sensor-data
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fieldId": 1,
+  "sensorType": "Temperature",
+  "value": 25.5,
+  "timestamp": "2026-02-07T10:30:00Z"
+}
+
+###
+
+### Ingest Sensor Data - Humidity
+POST {{AgroSolutions.Sensor.Ingestion_HostAddress}}/api/sensor-data
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fieldId": 2,
+  "sensorType": "Humidity",
+  "value": 65.0,
+  "timestamp": "2026-02-07T10:35:00Z"
+}
+
+###
+
+### Ingest Sensor Data - Soil Moisture
+POST {{AgroSolutions.Sensor.Ingestion_HostAddress}}/api/sensor-data
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fieldId": 1,
+  "sensorType": "SoilMoisture",
+  "value": 42.3,
+  "timestamp": "2026-02-07T10:40:00Z"
+}
+
+###
+
+### Ingest Sensor Data - Invalid FieldId (should fail with 400)
+POST {{AgroSolutions.Sensor.Ingestion_HostAddress}}/api/sensor-data
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fieldId": 0,
+  "sensorType": "Temperature",
+  "value": 25.5,
+  "timestamp": "2026-02-07T10:30:00Z"
+}
+
+###
+
+### Ingest Sensor Data - Empty SensorType (should fail with 400)
+POST {{AgroSolutions.Sensor.Ingestion_HostAddress}}/api/sensor-data
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fieldId": 1,
+  "sensorType": "",
+  "value": 25.5,
+  "timestamp": "2026-02-07T10:30:00Z"
+}
+
+###
+
+### Ingest Sensor Data - Future Timestamp (should fail with 400)
+POST {{AgroSolutions.Sensor.Ingestion_HostAddress}}/api/sensor-data
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fieldId": 1,
+  "sensorType": "Temperature",
+  "value": 25.5,
+  "timestamp": "2027-12-31T23:59:59Z"
+}
+
+###
+
+### Ingest Sensor Data - No Authorization (should fail with 401)
+POST {{AgroSolutions.Sensor.Ingestion_HostAddress}}/api/sensor-data
+Content-Type: application/json
+
+{
+  "fieldId": 1,
+  "sensorType": "Temperature",
+  "value": 25.5,
+  "timestamp": "2026-02-07T10:30:00Z"
+}
 
 ###
