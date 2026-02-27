@@ -1,4 +1,6 @@
 using Application.Exceptions;
+using OpenTelemetry.Trace;
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace AgroSolutions.Sensor.Ingestion.Middlewares;
@@ -23,6 +25,14 @@ public class ExceptionHandlingMiddleware
         catch (Exception ex)
         {
             _logger.LogError(ex, "Ocorreu um erro na requisição");
+
+            var activity = Activity.Current;
+            if (activity != null)
+            {
+                activity.SetStatus(ActivityStatusCode.Error, ex.Message);
+                activity.AddException(ex);
+            }
+
             await HandleExceptionAsync(context, ex);
         }
     }

@@ -6,9 +6,73 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var serviceName = builder.Configuration["Observability:ServiceName"] ?? "AgroSolutions.Sensor.Ingestion";
+var otlpEndpoint = builder.Configuration["Observability:OtlpEndpoint"];
+
+var resourceBuilder = ResourceBuilder.CreateDefault()
+    .AddService(serviceName)
+    .AddTelemetrySdk()
+    .AddEnvironmentVariableDetector();
+
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddOpenTelemetry(logging =>
+{
+    logging.IncludeFormattedMessage = true;
+    logging.IncludeScopes = true;
+    logging.SetResourceBuilder(resourceBuilder);
+
+    if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+    {
+        logging.AddOtlpExporter(options =>
+        {
+            options.Endpoint = new Uri(otlpEndpoint);
+        });
+    }
+});
+
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing =>
+    {
+        tracing.SetResourceBuilder(resourceBuilder)
+            .AddAspNetCoreInstrumentation(options =>
+            {
+                options.Filter = context => !context.Request.Path.Value!.Contains("/health");
+            })
+            .AddHttpClientInstrumentation();
+
+        if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+        {
+            tracing.AddOtlpExporter(options =>
+            {
+                options.Endpoint = new Uri(otlpEndpoint);
+            });
+        }
+    })
+    .WithMetrics(metrics =>
+    {
+        metrics.SetResourceBuilder(resourceBuilder)
+            .AddRuntimeInstrumentation()
+            .AddProcessInstrumentation()
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation();
+
+        if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+        {
+            metrics.AddOtlpExporter(options =>
+            {
+                options.Endpoint = new Uri(otlpEndpoint);
+            });
+        }
+    });
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
